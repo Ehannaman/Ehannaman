@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minesweeper</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+
+    h1 {
+      margin: 20px 0;
+      font-size: 2em;
+    }
+
+    #gameContainer {
+      display: inline-block;
+      margin: 20px;
+    }
+
+    #gameBoard {
+      display: grid;
+      border: 2px solid #333;
+      background-color: #ccc;
+    }
+
+    .cell {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #888;
+      font-size: 16px;
+      font-weight: bold;
+      background-color: #bbb;
+      cursor: pointer;
+    }
+
+    .cell.revealed {
+      background-color: #ddd;
+      cursor: default;
+    }
+
+    .cell.mine {
+      background-color: red;
+      color: white;
+    }
+
+    .cell.flagged {
+      background-color: #f3d250;
+    }
+
+    #controls {
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background-color: #555;
+    }
+
+    #difficultyScreen {
+      display: none;
+      margin: 20px;
+    }
+
+    .difficulty-button {
+      margin: 10px;
+      background-color: black;
+      color: white;
+      padding: 15px 30px;
+      font-size: 18px;
+      border: 2px solid #333;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .difficulty-button:hover {
+      background-color: #555;
+    }
+
+    #gameScreen {
+      display: none;
+    }
+
+    #winMessage {
+      margin-top: 20px;
+      font-size: 1.5em;
+      color: green;
+    }
+  </style>
+</head>
+<body>
+  <h1>Minesweeper</h1>
+  <div id="difficultyScreen">
+    <button class="difficulty-button" onclick="startGame('easy')">Easy</button>
+    <button class="difficulty-button" onclick="startGame('medium')">Medium</button>
+    <button class="difficulty-button" onclick="startGame('hard')">Hard</button>
+  </div>
+  <div id="gameScreen">
+    <div id="controls">
+      <button onclick="showDifficultyScreen()">New Game</button>
+    </div>
+    <div id="gameContainer">
+      <div id="gameBoard"></div>
+    </div>
+    <div id="winMessage"></div>
+  </div>
+
+  <script>
+    const rows = 10;
+    const cols = 10;
+    let board = [];
+    let gameBoardElement = document.getElementById('gameBoard');
+    let isGameOver = false;
+    let difficulty = 'easy';
+    const minesCount = { easy: 10, medium: 15, hard: 20 };
+    let colorInterval;
+
+    function showDifficultyScreen() {
+      clearInterval(colorInterval);
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('difficultyScreen').style.display = 'block';
+    }
+
+    function startGame(selectedDifficulty) {
+      difficulty = selectedDifficulty;
+      document.getElementById('difficultyScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('winMessage').textContent = '';
+      initializeGame();
+    }
+
+    function initializeGame() {
+      isGameOver = false;
+      createBoard();
+      placeMines();
+      calculateAdjacentMines();
+      renderBoard();
+    }
+
+    function createBoard() {
+      board = Array.from({ length: rows }, () =>
+        Array.from({ length: cols }, () => ({
+          mine: false,
+          revealed: false,
+          flagged: false,
+          adjacentMines: 0,
+        }))
+      );
+    }
+
+    function placeMines() {
+      let placedMines = 0;
+      const totalMines = minesCount[difficulty];
+
+      while (placedMines < totalMines) {
+        const row = Math.floor(Math.random() * rows);
+        const col = Math.floor(Math.random() * cols);
+
+        if (board[row][col].mine) continue;
+
+        // Apply constraints based on difficulty
+        if (difficulty === 'easy') {
+          if (row >= 3 && row <= 6 && col >= 3 && col <= 6) continue;
+        } else if (difficulty === 'medium') {
+          if (row >= 4 && row <= 5 && col >= 4 && col <= 5) continue;
+        }
+
+        board[row][col].mine = true;
+        placedMines++;
+      }
+    }
+
+    function calculateAdjacentMines() {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (board[row][col].mine) continue;
+
+          let mines = 0;
+          for (let r = -1; r <= 1; r++) {
+            for (let c = -1; c <= 1; c++) {
+              const newRow = row + r;
+              const newCol = col + c;
+              if (
+                newRow >= 0 &&
+                newRow < rows &&
+                newCol >= 0 &&
+                newCol < cols &&
+                board[newRow][newCol].mine
+              ) {
+                mines++;
+              }
+            }
+          }
+          board[row][col].adjacentMines = mines;
+        }
+      }
+    }
+
+    function renderBoard() {
+      gameBoardElement.innerHTML = '';
+      gameBoardElement.style.gridTemplateRows = `repeat(${rows}, 30px)`;
+      gameBoardElement.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          cell.dataset.row = row;
+          cell.dataset.col = col;
+
+          if (board[row][col].revealed) {
+            cell.classList.add('revealed');
+            if (board[row][col].mine) {
+              cell.classList.add('mine');
+              cell.textContent = '💣';
+            } else if (board[row][col].adjacentMines > 0) {
+              cell.textContent = board[row][col].adjacentMines;
+            }
+          } else if (board[row][col].flagged) {
+            cell.classList.add('flagged');
+            cell.textContent = '🚩';
+          }
+
+          cell.addEventListener('click', handleLeftClick);
+          cell.addEventListener('contextmenu', handleRightClick);
+
+          gameBoardElement.appendChild(cell);
+        }
+      }
+    }
+
+    function handleLeftClick(e) {
+      if (isGameOver) return;
+
+      const row = parseInt(e.target.dataset.row, 10);
+      const col = parseInt(e.target.dataset.col, 10);
+
+      if (board[row][col].flagged || board[row][col].revealed) return;
+
+      if (board[row][col].mine) {
+        gameOver();
+      } else {
+        revealCell(row, col);
+        if (checkWin()) {
+          celebrateWin();
+        }
+      }
+
+      renderBoard();
+    }
+
+    function handleRightClick(e) {
+      e.preventDefault();
+      if (isGameOver) return;
+
+      const row = parseInt(e.target.dataset.row, 10);
+      const col = parseInt(e.target.dataset.col, 10);
+
+      if (board[row][col].revealed) return;
+
+      board[row][col].flagged = !board[row][col].flagged;
+      renderBoard();
+    }
+
+    function revealCell(row, col) {
+      if (row < 0 || row >= rows || col < 0 || col >= cols) return;
+      if (board[row][col].revealed || board[row][col].flagged) return;
+
+      board[row][col].revealed = true;
+
+      if (board[row][col].adjacentMines === 0) {
+        for (let r = -1; r <= 1; r++) {
+          for (let c = -1; c <= 1; c++) {
+            revealCell(row + r, col + c);
+          }
+        }
+      }
+    }
+
+    function checkWin() {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (!board[row][col].mine && !board[row][col].revealed) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    function celebrateWin() {
+      isGameOver = true;
+      document.getElementById('winMessage').textContent = 'Congratulations! You won!';
+
+      // Reveal all cells
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          board[row][col].revealed = true;
+        }
+      }
+
+      renderBoard();
+
+      // Add color-changing celebration
+      const cells = document.querySelectorAll('.cell.revealed');
+      let colors = ['red', 'green', 'white'];
+      let colorIndex = 0;
+
+      colorInterval = setInterval(() => {
+        cells.forEach(cell => {
+          cell.style.backgroundColor = colors[colorIndex];
+        });
+        colorIndex = (colorIndex + 1) % colors.length;
+      }, 2000);
+    }
+
+    function gameOver() {
+      isGameOver = true;
+      alert('Game Over!');
+      showDifficultyScreen();
+    }
+
+    showDifficultyScreen();
+  </script>
+</body>
+</html>
